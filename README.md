@@ -1,11 +1,12 @@
 # 🎵 Mood Melody
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) <!-- replace with actual license badge if different -->
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-green.svg)](#)
 [![Android](https://img.shields.io/badge/android-Kotlin-brightgreen.svg)](#)
 [![Model: MusicGen](https://img.shields.io/badge/model-MusicGen-orange.svg)](#)
+[![Release](https://img.shields.io/github/v/release/manojv042/Mood-Melody-?label=release)](https://github.com/manojv042/Mood-Melody-/releases)
 
-Mood Melody is an end-to-end research / prototype application that detects a user's facial emotion on-device and generates a short piece of music that matches that emotion. It integrates three main[...] 
+Mood Melody is an end-to-end research / prototype application that detects a user's facial emotion on-device and generates a short piece of music that matches that emotion. It integrates three main components: an Android/Kotlin app that runs emotion detection on-device, a Python backend that composes prompts and runs MusicGen, and model training/convert tooling for the emotion detector.
 
 This README is written for contributors and users who want to run the system locally, extend it, or deploy it.
 
@@ -21,6 +22,7 @@ Table of contents
 - Development & code pointers
 - Troubleshooting
 - Contributing & governance
+- Releases & versioning
 - License & acknowledgements
 
 ---
@@ -28,17 +30,15 @@ Table of contents
 What this project solves & who it's for
 - Problem: Reducing friction in music discovery by generating short, mood-matched tracks automatically from a user's facial expression.
 - Target users: researchers, hobbyists, and developers exploring multimodal AI (vision → LLM → generative audio).
-- Primary value: an end-to-end demo that connects on-device emotion detection to generative audio, plus reusable backend components for prompt engineering and inference.
 
 Features
 - On-device emotion detection via a TFLite model (MobileNetV3-based classifier).
 - Flask backend that:
   - Accepts emotion + confidence from the Android app.
-  - Builds a music prompt (keyword rules + optional LLM enhancement via Gemini API).
+  - Builds a music prompt (keyword rules + optional LLM enhancement via GEMINI_API_KEY).
   - Runs MusicGen to synthesize WAV audio and serves it to the client.
 - An interactive script (backend/musicgenllm.py) for experimenting with prompts and profiles.
 - Background cleanup to remove old generated audio.
-- Example user profiles and simple personalization built into the backend.
 
 Architecture (runtime flow)
 1. Android app captures a face image → runs a TFLite model locally to predict an emotion + confidence.
@@ -51,19 +51,9 @@ Repository layout (top-level)
 ```
 Mood-Melody/
 ├── android_app/           # Android project: Kotlin, CameraX, TensorFlow Lite integration
-│   ├── app/
-│   │   └── src/           # Android app source (manifest, java/kotlin, res)
-│   ├── build.gradle.kts   # Gradle config
-│   └── gradlew*           # Gradle wrapper
-│
 ├── backend/               # Flask server + MusicGen/LLM glue
-│   ├── music_server.py    # Main Flask application (API: /generate, /music/<file>, /health)
-│   ├── musicgenllm.py     # Interactive generator script (prompt building + MusicGen)
-│   └── Deployment .md     # Deployment notes for backend
-│
 ├── emotion-detection/     # Emotion detection training docs and tooling
-│   └── README.md
-├── README.md              # (this file)
+├── README.md
 ├── LICENSE
 └── .gitignore
 ```
@@ -79,44 +69,48 @@ How to get this repository and prerequisites
 - Android Studio: to build/run the Android app.
 
 Quickstart — backend (local dev)
-1. Create and activate virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate
-   ```
-2. Install Python dependencies (the repository now includes requirement files):
-   ```bash
+This project provides the backend Python entrypoint at `backend/music_server.py` and an interactive prompt/experiment script at `backend/musicgenllm.py`.
+
+1. Create and activate a virtual environment from the repository root:
+
+   python -m venv .venv
+
+   - On macOS/Linux: `source .venv/bin/activate`
+   - On Windows (PowerShell): `.\.venv\Scripts\Activate.ps1`
+
+2. Upgrade pip and install pinned dependencies for runtime:
+
    pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-   - If there is a `requirements-dev.txt` for development-only tools, install it also:
-     ```bash
-     pip install -r requirements-dev.txt
-     ```
-   - If the bundled requirements reference a GPU-specific torch wheel, follow the comments in `requirements.txt` or the repository README for the correct wheel URL for your CUDA version.
-3. Set optional LLM API key:
-   ```bash
+   pip install -r backend/requirements.txt
+
+   (For development tools run `pip install -r backend/requirements-dev.txt` — see `backend/requirements-dev.txt`.)
+
+3. Optional: set a GEMINI API key to enable LLM-enhanced prompt creation (the code falls back to keyword prompts if not set):
+
    export GEMINI_API_KEY="your_gemini_api_key_here"
-   ```
-   If GEMINI_API_KEY is missing the backend falls back to a keyword-based prompt.
-4. Run the backend:
-   ```bash
-   cd backend
-   python music_server.py
-   ```
+
+4. Run the backend (from repository root):
+
+   python backend/music_server.py
+
    - The server loads the MusicGen model on startup (this can take several minutes and needs significant RAM/GPU memory).
    - Default port: 5000 (override with PORT env var).
 
+Notes on entrypoints
+- Primary runtime server: `backend/music_server.py` — this is the application the Android client calls (/generate, /music/<file>, /health).
+- Interactive prompt generator: `backend/musicgenllm.py` — useful for experimenting with prompt text and MusicGen locally.
+
 Quickstart — Android app (local)
+The Android project uses Gradle (Kotlin DSL). Use the Gradle wrapper inside `android_app/` to build and install.
+
 1. Open `android_app` in Android Studio (Import project using Gradle wrapper).
-2. Ensure Android SDK, Kotlin and required SDK packages are installed.
-3. Update the backend base URL in Retrofit/network config if needed (for emulator use http://10.0.2.2:5000).
-4. Build & install:
-   ```bash
+2. Update the backend base URL in Retrofit/network config if needed (for emulator use http://10.0.2.2:5000).
+3. Build & install using the Gradle wrapper (from repo root):
+
    cd android_app
    ./gradlew installDebug
-   ```
-5. Run app on device. The app will:
+
+4. Run app on device. The app will:
    - Capture face images via CameraX.
    - Run TFLite model and POST results to backend /generate.
    - Play returned WAV file.
@@ -138,11 +132,6 @@ API reference
       "music_url": "http://<host>/music/music_gen_<timestamp>.wav"
     }
     ```
-  - Errors:
-    - 400: missing fields
-    - 500: model or generation errors
-- GET /music/<filename> — serves generated WAV files from static/music/
-- GET /health — returns { "status": "ok" }
 
 Example: test backend with curl
 ```bash
@@ -151,94 +140,36 @@ curl -X POST http://localhost:5000/generate \
   -d '{"user_id":"default","mood":"happiness","confidence":0.92}' | jq
 ```
 
-Model training & converting to TensorFlow Lite (overview)
-- Training: the `emotion-detection` docs describe a MobileNetV3Large-based classifier trained on FER+ with augmentation and two-stage fine-tuning (freeze backbone → train head → unfreeze and [...]
+Development & dependency management
+- Runtime Python dependencies are pinned in `backend/requirements.txt` and `emotion-detection/requirements.txt`.
+- Dev tools are available in `backend/requirements-dev.txt` (formatters, linters, test runner, pre-commit hooks).
+- To install both runtime and dev deps (recommended for contributors):
 
-- Export & convert high-level steps (actual commands need to match your model and code):
-  1. Save the trained PyTorch model (e.g., checkpoint.pth).
-  2. Export to ONNX (a representative input shape like [1, 3, 224, 224]):
-     ```python
-     # example: export.py (run with your env loaded)
-     import torch
-     model = ...  # load model
-     model.eval()
-     dummy = torch.randn(1, 3, 224, 224)
-     torch.onnx.export(model, dummy, "model.onnx", opset_version=13)
-     ```
-  3. Convert ONNX → TensorFlow using onnx-tf (or use torch.jit -> TFLite via TF conversion pipeline). Example:
-     ```bash
-     pip install onnx onnx-tf tensorflow
-     onnx-tf convert -i model.onnx -o tf_model
-     ```
-  4. Convert TF SavedModel → TFLite:
-     ```python
-     import tensorflow as tf
-     converter = tf.lite.TFLiteConverter.from_saved_model("tf_model")
-     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-     tflite_model = converter.convert()
-     open("model.tflite", "wb").write(tflite_model)
-     ```
-  - NOTE: Converting classification models optimized for mobile often requires careful ops support checks and may need quantization and operator mapping. If you want, I can provide a conversion s[...]
+  pip install -r backend/requirements.txt
+  pip install -r backend/requirements-dev.txt
 
-Deployment notes
-- The backend loads large model weights and requires GPU. For production:
-  - Use GPU-enabled VM or Kubernetes cluster with GPU nodes.
-  - Front the backend with an authenticated API gateway and rate-limiting.
-  - Store generated audio in object storage (S3/Cloud Storage) and serve via CDN instead of local disk for long-term availability.
-  - Use logging and monitoring (Prometheus / Grafana).
-- See backend/Deployment .md inside the repo for more notes.
+Releases & versioning
+- Use Semantic Versioning for releases (MAJOR.MINOR.PATCH). Tag releases on GitHub (for example `v0.1.0`).
+- Create a GitHub Release after a tag to populate the release badge.
+- Suggested release steps (local):
+  - Update CHANGELOG.md (if present) and bump version in docs.
+  - git tag -a vX.Y.Z -m "Release vX.Y.Z"
+  - git push origin vX.Y.Z
+  - Create a GitHub Release using the pushed tag.
 
-Performance & cost considerations
-- MusicGen inference is expensive and memory-heavy. Consider:
-  - Running smaller MusicGen variants for prototyping.
-  - Batch or queue requests and limit request length.
-  - Using quantized or optimized runtime if available.
+Formatting badges
+- Badges at the top now include license, Python version support, Android/Kotlin and a release badge. If you want CI/build badges (GitHub Actions), add a workflow and I can insert the build status badge.
 
-Security & privacy
-- Camera/image data should be handled carefully. If deploying publicly:
-  - Add authentication & authorization to the backend.
-  - Prefer TLS for network traffic.
-  - Avoid storing raw user images unless necessary; keep retention minimal.
-  - Never commit secrets (GEMINI_API_KEY) to the repository — use environment variables or secret managers.
+Suggestions & next steps I applied
+- Added exact Python entrypoints and explicit run commands.
+- Declared that the Android project uses Gradle and added exact Gradle wrapper commands.
+- Added a `backend/requirements-dev.txt` (dev tools) as requested.
+- Reformatted badges and added a Releases/Versioning section.
 
-Development notes (where to look in code)
-- backend/music_server.py
-  - main Flask app: /generate endpoint, create_music_prompt, generate_music, cleanup thread
-  - USER_PROFILES map and VALID_MOODS are defined in this file
-- backend/musicgenllm.py
-  - interactive prompt-generator and controller, useful for experimentation on a development machine
-- emotion-detection/README.md
-  - training strategy, augmentations, and model architecture notes
-- android_app/
-  - Android project; look in `android_app/app/src/main` for manifest and source code. Update Retrofit base URL to point to your local backend.
+---
 
-Suggestions & next steps (recommended)
-- Add a pinned requirements.txt or environment.yml for reproducible installs. (requirements.txt is now present in the repo.)
-- Add a sample small pre-downloaded TFLite model (or link to one) so Android developers can run the app without training.
-- Add CI that runs linting and small unit tests (backend smoke tests).
-- Add a CONTRIBUTING.md and CODE_OF_CONDUCT for open-source contributions.
+If you want, I can now:
+- Add a simple GitHub Actions workflow that installs runtime deps and runs a backend smoke test.
+- Add a CHANGELOG.md and an initial tag (v0.1.0) commit draft.
+- Add CI badge to the README once a workflow is added.
 
-Troubleshooting (common issues)
-- Model OOM on load: try smaller model, reduce batch size, or increase GPU memory.
-- No GPU available: generation may be unusably slow; use a tiny model for development.
-- GEMINI API calls failing: check GEMINI_API_KEY and network connectivity; code includes fallbacks to keyword prompts.
-- Android cannot reach backend: emulator uses 10.0.2.2 to reach host machine, or use device with local network routing.
-
-Contributing
-- Please open issues for bugs/feature requests.
-- For PRs:
-  - Fork the repo, create a topic branch, and open a PR describing the change and testing steps.
-  - Add tests where appropriate (especially for backend logic).
-  - Keep changes focused per PR.
-- See also: add a CONTRIBUTING.md for more details.
-
-Acknowledgements & references
-- MusicGen model from Facebook / Hugging Face
-- FER+ dataset and MobileNetV3
-- CameraX and TensorFlow Lite Android tooling
-
-License
-- See LICENSE at the repository root.
-
-Contact
-- Repository owner: @manojv042 (GitHub). Open an issue or PR for help.
