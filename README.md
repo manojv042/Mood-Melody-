@@ -5,7 +5,7 @@
 [![Android](https://img.shields.io/badge/android-Kotlin-brightgreen.svg)](#)
 [![Model: MusicGen](https://img.shields.io/badge/model-MusicGen-orange.svg)](#)
 
-Mood Melody is an end-to-end research / prototype application that detects a user's facial emotion on-device and generates a short piece of music that matches that emotion. It integrates three main parts: an on-device TensorFlow Lite emotion detector (Android), a Flask backend that builds and optionally enhances music prompts, and MusicGen (Hugging Face transformers) for audio synthesis.
+Mood Melody is an end-to-end research / prototype application that detects a user's facial emotion on-device and generates a short piece of music that matches that emotion. It integrates three main[...] 
 
 This README is written for contributors and users who want to run the system locally, extend it, or deploy it.
 
@@ -84,13 +84,16 @@ Quickstart — backend (local dev)
    python -m venv venv
    source venv/bin/activate
    ```
-2. Minimal suggested packages (example; pin in requirements.txt later):
+2. Install Python dependencies (the repository now includes requirement files):
    ```bash
-   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu117  # GPU wheel, choose correct version
-   pip install transformers scipy numpy flask flask-cors requests
+   pip install --upgrade pip
+   pip install -r requirements.txt
    ```
-   - If you are on CPU-only, install CPU wheels (or conda).
-   - For MusicGen: use the Hugging Face transformers package that supports the MusicGen model. Check the model repo docs for exact versions.
+   - If there is a `requirements-dev.txt` for development-only tools, install it also:
+     ```bash
+     pip install -r requirements-dev.txt
+     ```
+   - If the bundled requirements reference a GPU-specific torch wheel, follow the comments in `requirements.txt` or the repository README for the correct wheel URL for your CUDA version.
 3. Set optional LLM API key:
    ```bash
    export GEMINI_API_KEY="your_gemini_api_key_here"
@@ -149,7 +152,8 @@ curl -X POST http://localhost:5000/generate \
 ```
 
 Model training & converting to TensorFlow Lite (overview)
-- Training: the `emotion-detection` docs describe a MobileNetV3Large-based classifier trained on FER+ with augmentation and two-stage fine-tuning (freeze backbone → train head → unfreeze and fine-tune).
+- Training: the `emotion-detection` docs describe a MobileNetV3Large-based classifier trained on FER+ with augmentation and two-stage fine-tuning (freeze backbone → train head → unfreeze and [...]
+
 - Export & convert high-level steps (actual commands need to match your model and code):
   1. Save the trained PyTorch model (e.g., checkpoint.pth).
   2. Export to ONNX (a representative input shape like [1, 3, 224, 224]):
@@ -174,7 +178,7 @@ Model training & converting to TensorFlow Lite (overview)
      tflite_model = converter.convert()
      open("model.tflite", "wb").write(tflite_model)
      ```
-  - NOTE: Converting classification models optimized for mobile often requires careful ops support checks and may need quantization and operator mapping. If you want, I can provide a conversion script tailored to your exact PyTorch model file.
+  - NOTE: Converting classification models optimized for mobile often requires careful ops support checks and may need quantization and operator mapping. If you want, I can provide a conversion s[...]
 
 Deployment notes
 - The backend loads large model weights and requires GPU. For production:
@@ -209,7 +213,7 @@ Development notes (where to look in code)
   - Android project; look in `android_app/app/src/main` for manifest and source code. Update Retrofit base URL to point to your local backend.
 
 Suggestions & next steps (recommended)
-- Add a pinned requirements.txt or environment.yml for reproducible installs.
+- Add a pinned requirements.txt or environment.yml for reproducible installs. (requirements.txt is now present in the repo.)
 - Add a sample small pre-downloaded TFLite model (or link to one) so Android developers can run the app without training.
 - Add CI that runs linting and small unit tests (backend smoke tests).
 - Add a CONTRIBUTING.md and CODE_OF_CONDUCT for open-source contributions.
