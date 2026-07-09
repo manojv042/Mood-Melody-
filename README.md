@@ -4,245 +4,206 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-green.svg)](#)
 [![Android](https://img.shields.io/badge/android-Kotlin-brightgreen.svg)](#)
 [![Model: MusicGen](https://img.shields.io/badge/model-MusicGen-orange.svg)](#)
-[![Release](https://img.shields.io/github/v/release/manojv042/Mood-Melody-?label=release)](https://github.com/manojv042/Mood-Melody-/releases)
 
-Mood Melody is an end-to-end research / prototype application that detects a user's facial emotion on-device and generates a short piece of music that matches that emotion. It integrates three main parts: an on-device TensorFlow Lite emotion detector (Android), a Flask backend that builds and optionally enhances music prompts, and MusicGen (Hugging Face transformers) for audio synthesis.
+Mood Melody is a research / prototype application that detects a user's facial emotion on-device and generates a short piece of music that matches that emotion. It combines an Android client (Kotlin) with a Python backend that composes prompts and runs MusicGen to synthesize audio.
 
-This README is written for contributors and users who want to run the system locally, extend it, or deploy it.
+This README is aimed at contributors and users who want to run the system locally, extend it, or deploy it.
 
-Table of contents
-- What this project solves & who it's for
+---
+
+Table of Contents
+- Project overview
 - Features
 - Architecture (high-level)
 - Repository layout
 - Quickstart (backend & Android)
-- API reference & examples
-- Model training & TFLite conversion
+- API reference
+- Model & TFLite conversion (overview)
 - Deployment notes
-- Development & dependency management
-- Troubleshooting
-- Contributing & governance
-- Releases & versioning
-- License & acknowledgements
+- Development & testing
+- Contributing
+- License & contact
 
 ---
 
-What this project solves & who it's for
-- Problem: Reducing friction in music discovery by generating short, mood-matched tracks automatically from a user's facial expression.
-- Target users: researchers, hobbyists, and developers exploring multimodal AI (vision → LLM → generative audio).
+## Project overview
 
-Features
-- On-device emotion detection via a TFLite model (MobileNetV3-based classifier).
-- Flask backend that:
-  - Accepts emotion + confidence from the Android app.
-  - Builds a music prompt (keyword rules + optional LLM enhancement via GEMINI_API_KEY).
-  - Runs MusicGen to synthesize WAV audio and serves it to the client.
-- An interactive script (backend/musicgenllm.py) for experimenting with prompts and profiles.
-- Background cleanup to remove old generated audio.
-- Example user profiles and simple personalization built into the backend.
+Mood Melody maps facial emotion -> short generated music. The Android app captures a face image and runs a TensorFlow Lite emotion classifier on-device, then sends the emotion + confidence to a Python backend which builds a prompt (optionally enhanced by an LLM) and generates audio using MusicGen.
 
-Languages
-- Kotlin: 72.1% (Android app is the majority of source code)
-- Python: 27.9% (backend + ML code)
+Languages:
+- Kotlin — ~72.1% (Android client)
+- Python — ~27.9% (backend, glue, and ML utilities)
 
-Architecture (runtime flow)
-1. Android app captures a face image → runs a TFLite model locally to predict an emotion + confidence.
-2. App POSTs JSON to backend /generate endpoint with user_id, mood, confidence.
-3. Backend composes music prompt (rules + optional LLM via GEMINI_API_KEY).
-4. Backend invokes MusicGen via transformers API, produces a WAV file under static/music/.
-5. Backend returns music URL to the Android app; app downloads/plays it.
+## Features
+- On-device emotion detection via a TFLite model
+- Flask backend with endpoints to request generation and serve audio
+- Prompt-building logic with optional LLM enrichment (GEMINI_API_KEY)
+- Music synthesis via MusicGen (produces WAV files)
+- Example scripts for experimentation and prompt tuning
 
-Repository layout (top-level)
+## Architecture (runtime flow)
+1. Android app captures a face image and runs TFLite to predict an emotion + confidence.
+2. App POSTs JSON to backend `/generate` with `user_id`, `mood`, and `confidence`.
+3. Backend composes a MusicGen prompt (rules + optional LLM) and runs MusicGen to synthesize audio.
+4. Backend saves a WAV file (static/music/) and returns a URL to the app.
+
+## Repository layout (top-level)
 ```
 Mood-Melody/
-├── android_app/           # Android project: Kotlin, CameraX, TensorFlow Lite integration
-│   ├── app/               # Android source (manifest, java/kotlin, res)
+├── android_app/           # Android project: Kotlin, CameraX, TFLite integration
+│   ├── app/               # Android source (manifest, kotlin, res, etc.)
 │   ├── build.gradle.kts
 │   └── gradlew*
-│
+
 ├── backend/               # Flask server + MusicGen/LLM glue
 │   ├── music_server.py    # Main Flask application (API: /generate, /music/<file>, /health)
-│   ├── musicgenllm.py     # Interactive generator script (prompt building + MusicGen)
-│   ├── requirements.txt   # Pinned Python dependencies for the backend
-│   └── Deployment .md     # Deployment notes for backend
-│
+│   ├── musicgenllm.py     # Interactive generator & prompt builder
+│   ├── requirements.txt
+│   └── Deployment .md     # Deployment notes
+
 ├── emotion-detection/     # Emotion detection training docs and tooling
 │   └── README.md
-├── README.md              # (this file)
+├── README.md
 ├── LICENSE
 └── .gitignore
 ```
 
-How to get this repository and prerequisites
-- Clone:
-  ```bash
-  git clone https://github.com/manojv042/Mood-Melody-.git
-  cd Mood-Melody-
-  ```
-- Recommended host for backend: a GPU-enabled Linux machine (NVIDIA GPU). MusicGen model inference is GPU-intensive; CPU-only is extremely slow.
-- Python: 3.10+
-- Android Studio: to build/run the Android app (Kotlin source is the majority of this repo).
+---
 
-Quickstart — backend (local dev)
-This project provides the backend Python entrypoint at `backend/music_server.py` and an interactive prompt/experiment script at `backend/musicgenllm.py`.
+## Quickstart — backend (local development)
+Notes: MusicGen requires large models and benefits greatly from a GPU. For quick iteration, test with small models or mocked responses.
 
-1. Create and activate a virtual environment from the repository root:
+1. Clone and enter repo:
+```bash
+git clone https://github.com/manojv042/Mood-Melody-.git
+cd Mood-Melody-
+```
 
-   ```bash
-   python -m venv .venv
-   # macOS / Linux
-   source .venv/bin/activate
-   # Windows (PowerShell)
-   .\.venv\Scripts\Activate.ps1
-   ```
+2. Create & activate a Python virtual environment:
+```bash
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+```
 
-2. Upgrade pip and install the pinned runtime packages from the repository's requirements file:
+3. Install backend dependencies:
+```bash
+pip install --upgrade pip
+pip install -r backend/requirements.txt
+```
 
-   ```bash
-   pip install --upgrade pip
-   pip install -r backend/requirements.txt
-   ```
+4. (Optional) Set GEMINI API key for LLM prompt enhancement:
+```bash
+export GEMINI_API_KEY="your_gemini_api_key_here"
+```
 
-   Notes:
-   - `backend/requirements.txt` contains pinned versions. Review the file if you run into incompatibilities (especially torch + CUDA).
-   - Installing PyTorch with a GPU-enabled wheel is recommended. See https://pytorch.org for the correct wheel for your CUDA version; if needed, install PyTorch first and then `pip install -r backend/requirements.txt` minus torch.
+5. Run the backend server:
+```bash
+python backend/music_server.py
+```
+Default port: 5000 (override with `PORT` env var). The first model load may take several minutes and requires significant RAM/GPU.
 
-3. Optional: set a GEMINI API key to enable LLM-enhanced prompt creation (the code falls back to a keyword prompt if not set):
+## Quickstart — Android app (local)
+1. Open `android_app` in Android Studio (import the Gradle project).
+2. Update the backend base URL in the app network/Retrofit config. For the emulator, use `http://10.0.2.2:5000`.
+3. Build & install via Gradle wrapper:
+```bash
+cd android_app
+./gradlew installDebug
+```
+4. Run the app. Typical flow:
+- Capture face via CameraX
+- Run TFLite emotion model locally
+- POST emotion to backend `/generate`
+- Download & play returned WAV file
 
-   ```bash
-   export GEMINI_API_KEY="your_gemini_api_key_here"
-   ```
+---
 
-4. Run the backend (from repository root):
-
-   ```bash
-   python backend/music_server.py
-   ```
-
-   - The server loads the MusicGen model on startup (this can take several minutes and needs significant RAM/GPU memory).
-   - Default port: 5000 (override with PORT env var).
-
-Quickstart — Android app (local)
-The Android project uses Gradle (Kotlin DSL). Use the Gradle wrapper inside `android_app/` to build and install.
-
-1. Open `android_app` in Android Studio (Import project using Gradle wrapper).
-2. Update the backend base URL in Retrofit/network config if needed (for emulator use `http://10.0.2.2:5000`).
-3. Build & install using the Gradle wrapper (from repo root):
-
-   ```bash
-   cd android_app
-   ./gradlew installDebug
-   ```
-
-4. Run app on device. The app will:
-   - Capture face images via CameraX.
-   - Run TFLite model and POST results to backend /generate.
-   - Play returned WAV file.
-
-API reference
+## API reference
 - POST /generate
-  - Request:
-    ```json
+  - Request JSON:
     {
       "user_id": "default",
       "mood": "happiness",
       "confidence": 0.82
     }
-    ```
   - Response (200):
-    ```json
     {
       "prompt": "<string used as MusicGen prompt>",
       "music_url": "http://<host>/music/music_gen_<timestamp>.wav"
     }
-    ```
-  - Errors:
-    - 400: missing fields
-    - 500: model or generation errors
-- GET /music/<filename> — serves generated WAV files from static/music/
-- GET /health — returns { "status": "ok" }
+  - Errors: 400 (bad request), 500 (model/generation errors)
 
-Example: test backend with curl
+- GET /music/<filename> — serves generated WAV files from `static/music/`
+- GET /health — returns `{ "status": "ok" }`
+
+Example curl:
 ```bash
 curl -X POST http://localhost:5000/generate \
   -H "Content-Type: application/json" \
   -d '{"user_id":"default","mood":"happiness","confidence":0.92}' | jq
 ```
 
-Model training & converting to TensorFlow Lite (overview)
-- Training: the `emotion-detection` docs describe a MobileNetV3Large-based classifier trained on FER+ with augmentation and two-stage fine-tuning (freeze backbone → train head → unfreeze and fine-tune).
-- Export & convert high-level steps (actual commands need to match your model and code):
-  1. Save the trained PyTorch model (e.g., checkpoint.pth).
-  2. Export to ONNX (a representative input shape like [1, 3, 224, 224]):
-     ```python
-     # example: export.py (run with your env loaded)
-     import torch
-     model = ...  # load model
-     model.eval()
-     dummy = torch.randn(1, 3, 224, 224)
-     torch.onnx.export(model, dummy, "model.onnx", opset_version=13)
-     ```
-  3. Convert ONNX → TensorFlow using onnx-tf (or use torch.jit -> TFLite via TF conversion pipeline). Example:
-     ```bash
-     pip install onnx onnx-tf tensorflow
-     onnx-tf convert -i model.onnx -o tf_model
-     ```
-  4. Convert TF SavedModel → TFLite:
-     ```python
-     import tensorflow as tf
-     converter = tf.lite.TFLiteConverter.from_saved_model("tf_model")
-     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-     tflite_model = converter.convert()
-     open("model.tflite", "wb").write(tflite_model)
-     ```
-  - NOTE: Converting classification models optimized for mobile often requires careful ops support checks and may need quantization and operator mapping. If you want, I can provide a conversion script tailored to your exact PyTorch model file.
+---
 
-Deployment notes
-- The backend loads large model weights and requires GPU. For production:
-  - Use GPU-enabled VM or Kubernetes cluster with GPU nodes.
-  - Front the backend with an authenticated API gateway and rate-limiting.
-  - Store generated audio in object storage (S3/Cloud Storage) and serve via CDN instead of local disk for long-term availability.
-  - Use logging and monitoring (Prometheus / Grafana).
-- See backend/Deployment .md inside the repo for more notes.
+## Model training & TFLite conversion (overview)
+See `emotion-detection/README.md` for details. High-level steps:
+1. Train on FER+ (MobileNetV3Large backbone + custom head).
+2. Export to ONNX (or TorchScript) and convert to TensorFlow SavedModel if needed.
+3. Convert SavedModel → TFLite with appropriate optimizations/quantization for mobile.
 
-Development & dependency management
-- Runtime Python dependencies are pinned in `backend/requirements.txt`.
-- If you plan to contribute developer tooling (linters, formatters, test runners), add `backend/requirements-dev.txt` and document it here. (At the time of writing only `backend/requirements.txt` is present.)
-- To install runtime dependencies:
+If you want a conversion script for your specific model, I can provide one.
 
-  ```bash
-  pip install -r backend/requirements.txt
-  ```
+---
 
-Releases & versioning
-- Use Semantic Versioning for releases (MAJOR.MINOR.PATCH). Tag releases on GitHub (for example `v0.1.0`).
-- Create a GitHub Release after a tag to populate the release badge.
+## Deployment notes
+- Production should run the heavy MusicGen workload on GPU-enabled hosts.
+- Consider moving generated audio to object storage (S3 / Cloud Storage) and serve via CDN.
+- Use an API gateway with authentication & rate limiting.
+- Add logging, monitoring, and automated health checks.
 
-Suggestions & next steps
-- Add a sample small pre-downloaded TFLite model (or link to one) so Android developers can run the app without training.
-- Add CI that runs linting and a backend smoke test.
-- Add CONTRIBUTING.md and CODE_OF_CONDUCT for open-source contributions.
+---
 
-Troubleshooting (common issues)
-- Model OOM on load: try smaller model, reduce batch size, or increase GPU memory.
-- No GPU available: generation may be unusably slow; use a tiny model for development.
-- GEMINI API calls failing: check GEMINI_API_KEY and network connectivity; code includes fallbacks to keyword prompts.
-- Android cannot reach backend: emulator uses `10.0.2.2` to reach host machine, or use device with local network routing.
+## Development & testing
+- Backend dependencies: `backend/requirements.txt`.
+- Kotlin: use Android Studio + Gradle wrapper in `android_app/`.
 
-Contributing
-- Please open issues for bugs/feature requests.
-- For PRs:
-  - Fork the repo, create a topic branch, and open a PR describing the change and testing steps.
-  - Add tests where appropriate (especially for backend logic).
-  - Keep changes focused per PR.
+Kotlin tests (examples):
+```bash
+# From android_app
+./gradlew test
+./gradlew connectedAndroidTest
+```
 
-Acknowledgements & references
-- MusicGen model from Facebook / Hugging Face
-- FER+ dataset and MobileNetV3
-- CameraX and TensorFlow Lite Android tooling
+Python tests (if present):
+```bash
+pytest
+```
 
-License
-- See LICENSE at the repository root.
+---
 
-Contact
-- Repository owner: @manojv042 (GitHub). Open an issue or PR for help.
+## Contributing
+1. Fork the repo and create a topic branch: `git checkout -b feature/your-feature`
+2. Make changes, add tests where appropriate.
+3. Open a Pull Request describing your changes and how to test them.
+
+Consider adding `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` for community contributions.
+
+---
+
+## License
+This project is licensed under the MIT License — see the `LICENSE` file for details.
+
+## Contact
+Repository owner: @manojv042
+Open issues or PRs on GitHub for questions or support.
+
+---
+
+Thanks — if you'd like, I can:
+- Update the README to include screenshots and example WAV clips
+- Add a small pre-downloaded TFLite model for quick Android testing
+- Create CONTRIBUTING.md and a PR template
+
