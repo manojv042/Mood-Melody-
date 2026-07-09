@@ -1,0 +1,20 @@
+# Android / Gradle
+.gradle/
+**/.gradle/
+build/
+**/build/
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Models / generated files
+*.pth
+*.tflite
+*.wav
+static/music/
+
+# OS
+.DS_Store
+Thumbs.db
