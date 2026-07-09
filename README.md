@@ -68,6 +68,20 @@ Mood-Melody/
 └── .gitignore
 ```
 
+### Files inside emotion-detection/
+The emotion-detection directory contains the training code and dependency list used to prepare the on-device TFLite model. The key files are:
+
+- emotion-detection/README.md — Module overview, training strategy, preprocessing and model architecture notes.
+- emotion-detection/requirements.txt — Pinned Python packages required for training and evaluation (matplotlib, numpy, Pillow, scikit-learn, seaborn, torch, torchvision, etc.).
+- emotion-detection/train_model.py — The main training script. What it does:
+  - Loads FER+ labels from a CSV and maps image filenames to train/validation/test splits.
+  - Implements a PyTorch MobileNetV3Large-based model with a custom classification head.
+  - Implements data loading, preprocessing (grayscale→RGB, resize, normalization), light augmentations, and class-weighted loss.
+  - Trains in two phases (freeze backbone → train head, then unfreeze and fine-tune), with early stopping and learning rate scheduling.
+  - Saves best model checkpoint, and produces training curves (training_curves.png) and confusion matrix output.
+
+If there are other files you expect to see in this folder, tell me their names and I will include them in the documentation and link to usage examples.
+
 ---
 
 ## Quickstart — backend (local development)
